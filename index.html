@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Run Club</title>
+<meta name="theme-color" content="#152019">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Run Club">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --bg:#EEF1EC; --surface:#FFFFFF; --sunk:#E2E7E0; --ink:#152019; --muted:#5D6B62; --line:#CDD5CC;
+  --accent:#2747E6; --accent-ink:#FFFFFF; --amber:#E39A1F; --go:#1E8A52; --stop:#C2410C;
+  --display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --body:"Barlow","Segoe UI",system-ui,-apple-system,sans-serif;
+  --navh:64px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0F1512; --surface:#18211C; --sunk:#222D27; --ink:#E8EEE9; --muted:#9AA9A0; --line:#2E3A33;
+  --accent:#7D93FF; --accent-ink:#0B1020; --amber:#F2B24A; --go:#4CC786; --stop:#FB8A4C; color-scheme:dark}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--body);overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);text-transform:uppercase;letter-spacing:.02em;margin:0;line-height:1}
+h2{font-size:28px;font-weight:800}
+h3{font-size:18px;font-weight:800;letter-spacing:.05em}
+.num{font-variant-numeric:tabular-nums}
+.label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:700;background:var(--sunk);color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.go{background:var(--go);color:#fff}
+.btn.stop{background:var(--stop);color:#fff}
+.btn.ghost{background:transparent;border:1.5px solid var(--line)}
+.btn.small{padding:7px 12px;font-size:14px;border-radius:9px}
+.btn:disabled{opacity:.45}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.between{justify-content:space-between}
+
+.app{position:fixed;inset:0;display:flex;flex-direction:column}
+.screen{flex:1;min-height:0;display:none;flex-direction:column;position:relative}
+.screen.on{display:flex}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;
+  padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.scroll>.inner{max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+
+nav.tabs{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+nav.tabs button{background:none;border:0;padding:9px 4px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:600;color:var(--muted)}
+nav.tabs svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button.on{color:var(--accent)}
+nav.tabs.locked button:not(.on){opacity:.35;pointer-events:none}
+
+/* map screens */
+.mapwrap{flex:1;min-height:0;position:relative}
+.map{position:absolute;inset:0;background:var(--sunk)}
+.fab{position:absolute;right:max(12px,env(safe-area-inset-right,0px));z-index:500;width:46px;height:46px;border-radius:50%;border:0;background:var(--surface);color:var(--ink);box-shadow:0 2px 10px rgba(0,0,0,.25);display:grid;place-items:center}
+.fab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.topbar{position:absolute;left:0;right:0;top:0;z-index:500;padding:calc(env(safe-area-inset-top,0px) + 10px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.pill{background:var(--surface);border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.18);display:flex;gap:6px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.good{background:var(--go)}.dot.ok{background:var(--amber)}.dot.bad{background:var(--stop)}
+
+.panel{background:var(--surface);border-top:1px solid var(--line);padding:14px max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
+.panel .inner{max-width:620px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;gap:4px}
+.metrics b{display:block;font-family:var(--display);font-weight:900;font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.metrics .hero{grid-column:1/-1}
+.metrics .hero b{font-size:84px;color:var(--accent)}
+.controls{display:flex;gap:10px;justify-content:center}
+.controls .btn{flex:1;max-width:200px;padding:16px;font-size:18px;border-radius:14px}
+.lastsplit{text-align:center;font-size:14px;min-height:20px}
+
+/* builder */
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;background:var(--sunk);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;padding:7px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.rdist{font-family:var(--display);font-size:34px;font-weight:900;line-height:1}
+input.text,select.text{background:var(--bg);border:1.5px solid var(--line);border-radius:9px;padding:9px 10px;min-width:0}
+
+/* lists */
+.list{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.item{display:grid;grid-template-columns:58px 1fr auto;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:center;background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
+.item .main{min-width:0}
+.item .t{font-weight:700}
+.item .s{font-size:14px;color:var(--muted)}
+.item svg.mini{width:58px;height:58px;background:var(--sunk);border-radius:10px}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stats>div{background:var(--surface);padding:12px 14px}
+.stats b{display:block;font-family:var(--display);font-size:30px;font-weight:800;line-height:1.05}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-size:11px;font-family:var(--body)}
+table.splits{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.splits td,table.splits th{padding:8px 4px;border-bottom:1px solid var(--line);text-align:left}
+table.splits th{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.bar{height:8px;border-radius:4px;background:var(--accent)}
+
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;flex-direction:column}
+.sheet[hidden]{display:none}
+.sheet .head{padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);background:var(--surface)}
+.sheet .dmap{height:42vh;min-height:220px;position:relative}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--navh) + 20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:2000;max-width:90vw;text-align:center}
+.note{font-size:14px;color:var(--muted)}
+.leaflet-container{font-family:var(--body)}
+.me{width:18px;height:18px;border-radius:50%;background:var(--accent);border:3px solid #fff;box-shadow:0 0 0 6px color-mix(in srgb,var(--accent) 25%,transparent)}
+.wp{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--accent)}
+.wp.start{border-color:var(--go);background:var(--go)}
+.today{font-size:14px;text-align:center;min-height:20px}
+.today b{color:var(--ink)}
+.chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--sunk);color:var(--muted);margin-right:6px;vertical-align:1px}
+.chip.long{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}
+.chip.tempo,.chip.intervals,.chip.hills{background:color-mix(in srgb,var(--amber) 22%,transparent);color:var(--ink)}
+.chip.race{background:var(--ink);color:var(--bg)}
+.week{border-top:2px solid var(--ink)}
+.week .wh{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0 6px}
+.week.current{background:color-mix(in srgb,var(--accent) 7%,transparent);border-top-color:var(--accent);border-radius:0 0 10px 10px;padding-inline:10px}
+.sess{display:grid;grid-template-columns:26px 50px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.sess input{width:22px;height:22px;accent-color:var(--accent)}
+.sess .d{font-weight:700;font-size:14px;line-height:1.2}
+.sess .w{min-width:0}
+.sess.done .w b{color:var(--muted);text-decoration:line-through}
+.sess .mi{font-family:var(--display);font-size:20px;font-weight:800}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.badge{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:14px 10px;border-radius:12px;border:1.5px dashed var(--line)}
+.badge .medal{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:20px;background:var(--sunk);color:var(--muted)}
+.badge.got{border-style:solid;border-color:var(--amber);background:var(--surface)}
+.badge.got .medal{background:var(--amber);color:#1B1305;box-shadow:inset 0 0 0 4px rgba(255,255,255,.35)}
+.badge b{font-size:15px}.badge span{font-size:13px;color:var(--muted)}
+.progress{height:8px;border-radius:4px;background:var(--sunk);overflow:hidden}.progress>div{height:100%;background:var(--accent)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- RECORD -->
+  <section class="screen on" id="s-record">
+    <div class="mapwrap">
+      <div class="map" id="recMap"></div>
+      <div class="topbar">
+        <div class="pill" id="gpsPill"><span class="dot" id="gpsDot"></span><span id="gpsText">GPS off</span></div>
+        <div class="pill" id="followPill" hidden><span id="followText"></span><button class="btn small ghost" id="unfollow" style="padding:2px 8px">×</button></div>
+      </div>
+      <button class="fab" id="recCenter" style="bottom:14px" aria-label="Center on me"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    </div>
+    <div class="panel"><div class="inner">
+      <div class="metrics">
+        <div class="hero"><b id="mDist">0.00</b><span class="label">Miles</span></div>
+        <div><b id="mTime">0:00</b><span class="label">Time</span></div>
+        <div><b id="mPace">–</b><span class="label">Pace /mi</span></div>
+        <div><b id="mAvg">–</b><span class="label">Avg /mi</span></div>
+      </div>
+      <div class="lastsplit muted num" id="lastSplit"></div>
+      <div class="today muted" id="todayLine"></div>
+      <div class="controls">
+        <button class="btn go" id="bStart">Start</button>
+        <button class="btn" id="bPause" hidden>Pause</button>
+        <button class="btn stop" id="bStop" hidden>Finish</button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ROUTES -->
+  <section class="screen" id="s-routes">
+    <div class="mapwrap">
+      <div class="map" id="routeMap"></div>
+      <div class="topbar">
+        <div class="pill"><span class="num" id="rDistPill">0.00 mi</span></div>
+        <div class="pill" id="routeHint">Tap the map to start a route</div>
+      </div>
+      <button class="fab" id="rtCenter" style="bottom:14px" aria-label="Center on me"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    </div>
+    <div class="panel"><div class="inner">
+      <div class="row between">
+        <div class="seg" role="group" aria-label="Route mode">
+          <button id="modeDraw" class="on">Draw</button>
+          <button id="modeLoop">Auto loop</button>
+          <button id="modeSaved">Saved</button>
+        </div>
+        <label class="row note" style="gap:6px"><input type="checkbox" id="snap" checked> Follow roads</label>
+      </div>
+
+      <div id="pDraw" class="tools">
+        <button class="btn small" id="rUndo">Undo</button>
+        <button class="btn small" id="rBack">Out &amp; back</button>
+        <button class="btn small" id="rClose">Close loop</button>
+        <button class="btn small ghost" id="rClear">Clear</button>
+      </div>
+
+      <div id="pLoop" class="tools" hidden>
+        <select class="text" id="loopMi" aria-label="Loop distance">
+          <option value="2">2 mi</option><option value="3" selected>3 mi</option><option value="3.1">5K</option><option value="4">4 mi</option><option value="5">5 mi</option><option value="6.2">10K</option><option value="8">8 mi</option><option value="10">10 mi</option><option value="13.1">13.1 mi</option>
+        </select>
+        <button class="btn small primary" id="loopGo">Make a loop</button>
+        <span class="note">Starts at your location, or the map center if GPS is off.</span>
+      </div>
+
+      <div id="pSaved" hidden><div class="list" id="routeList"></div></div>
+
+      <div class="row" id="saveRow">
+        <input class="text" id="rName" placeholder="Route name" style="flex:1">
+        <button class="btn primary" id="rSave" disabled>Save route</button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="screen" id="s-history">
+    <div class="scroll"><div class="inner">
+      <div class="row between"><h2>Runs</h2><span class="label num" id="histCount"></span></div>
+      <div id="histList"></div>
+    </div></div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="screen" id="s-plan">
+    <div class="scroll"><div class="inner">
+      <h2>Training plan</h2>
+      <div id="planSetup"></div>
+      <div id="planBody"></div>
+    </div></div>
+  </section>
+
+  <!-- STATS -->
+  <section class="screen" id="s-stats">
+    <div class="scroll"><div class="inner">
+      <h2>Stats</h2>
+      <div class="stats" id="statGrid"></div>
+      <div><h3 style="margin-bottom:8px">Weekly miles</h3><div id="weekChart"></div></div>
+      <div><h3 style="margin-bottom:8px">Personal records</h3><div class="list" id="prList"></div></div>
+      <div><h3 style="margin-bottom:8px">Streaks</h3><div class="stats" id="streakGrid"></div></div>
+      <div><h3 style="margin-bottom:8px">Badges</h3><div class="badges" id="badgeGrid"></div></div>
+      <div class="note">Your runs and routes are stored on this phone. Use Export on a run to keep a GPX copy or upload it elsewhere.</div>
+    </div></div>
+  </section>
+
+  <nav class="tabs" id="tabs">
+    <button class="on" data-s="record"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>Record</button>
+    <button data-s="routes"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg>Routes</button>
+    <button data-s="history"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Runs</button>
+    <button data-s="plan"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14l2 2 4-4"/></svg>Plan</button>
+    <button data-s="stats"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</button>
+  </nav>
+</div>
+
+<!-- RUN DETAIL / SAVE SHEET -->
+<div class="sheet" id="sheet" hidden>
+  <div class="head">
+    <button class="btn small ghost" id="shClose">Close</button>
+    <h3 id="shTitle">Run</h3>
+    <span style="width:64px"></span>
+  </div>
+  <div class="dmap"><div class="map" id="detailMap"></div></div>
+  <div class="scroll" style="padding-top:16px"><div class="inner" id="shBody"></div></div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const M_PER_MI=1609.344;
+const ROUTER="https://routing.openstreetmap.de/routed-foot/route/v1/driving/";
+const HOME=[39.5,-98.35]; // map starts zoomed out until GPS locks
+
+/* ---------- helpers ---------- */
+const pad=n=>String(n).padStart(2,"0");
+const fmtDur=s=>{s=Math.max(0,Math.round(s));const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h?h+":"+pad(m)+":"+pad(x):m+":"+pad(x)};
+const fmtPace=spm=>!isFinite(spm)||spm<=0||spm>3600?"–":Math.floor(spm/60)+":"+pad(Math.round(spm%60)%60);
+const miles=m=>(m/M_PER_MI).toFixed(2);
+const ymd=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+function monday(d){d=new Date(d);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d}
+function el(tag,cls,text){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function toast(msg,ms){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>t.hidden=true,ms||2400)}
+function hav(a,b){const R=6371008.8,r=x=>x*Math.PI/180,dl=r(b[0]-a[0]),dn=r(b[1]-a[1]);const h=Math.sin(dl/2)**2+Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dn/2)**2;return 2*R*Math.asin(Math.min(1,Math.sqrt(h)))}
+function pathLen(pts){let d=0;for(let i=1;i<pts.length;i++)d+=hav(pts[i-1],pts[i]);return d}
+function dest(p,brgDeg,m){const R=6371008.8,b=brgDeg*Math.PI/180,d=m/R,la=p[0]*Math.PI/180,lo=p[1]*Math.PI/180;
+  const la2=Math.asin(Math.sin(la)*Math.cos(d)+Math.cos(la)*Math.sin(d)*Math.cos(b));
+  const lo2=lo+Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(la),Math.cos(d)-Math.sin(la)*Math.sin(la2));
+  return [la2*180/Math.PI,lo2*180/Math.PI]}
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+/* ---------- IndexedDB ---------- */
+const DB=(()=>{
+  let p=null;
+  function open(){if(p)return p;p=new Promise((res,rej)=>{const r=indexedDB.open("runclub",1);r.onupgradeneeded=()=>{r.result.createObjectStore("runs",{keyPath:"id"});r.result.createObjectStore("routes",{keyPath:"id"})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});return p}
+  async function tx(store,mode,fn){const db=await open();return new Promise((res,rej)=>{const t=db.transaction(store,mode),s=t.objectStore(store),r=fn(s);t.oncomplete=()=>res(r&&r.result);t.onerror=()=>rej(t.error)})}
+  return{all:s=>tx(s,"readonly",st=>st.getAll()),put:(s,v)=>tx(s,"readwrite",st=>st.put(v)),del:(s,id)=>tx(s,"readwrite",st=>st.delete(id))};
+})();
+let RUNS=[],ROUTES=[];
+async function loadAll(){try{RUNS=(await DB.all("runs"))||[];ROUTES=(await DB.all("routes"))||[]}catch(e){toast("Storage unavailable. Runs won't be saved in private browsing.")}RUNS.sort((a,b)=>b.start-a.start);ROUTES.sort((a,b)=>b.created-a.created);renderAll()}
+if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+
+/* ---------- maps ---------- */
+function makeMap(id){
+  const m=L.map(id,{zoomControl:false,attributionControl:true}).setView(HOME,4);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(m);
+  return m;
+}
+const recMap=makeMap("recMap"),routeMap=makeMap("routeMap");let detailMap=null;
+const meIcon=L.divIcon({className:"",html:'<div class="me"></div>',iconSize:[18,18],iconAnchor:[9,9]});
+const accent=()=>css("--accent")||"#2747E6";
+
+/* ---------- live location (always-on watch while app visible) ---------- */
+let lastFix=null,watchId=null,meRec=null,meRoute=null,centeredOnce=false;
+function setGps(state,text){$("gpsDot").className="dot "+state;$("gpsText").textContent=text}
+function startWatch(){
+  if(watchId!=null)return;
+  if(!("geolocation" in navigator)){setGps("bad","No GPS in this browser");return}
+  setGps("ok","Finding GPS…");
+  watchId=navigator.geolocation.watchPosition(onFix,err=>{
+    if(err.code===1){setGps("bad","Location blocked");toast("Allow location: Settings › Privacy › Location Services › Safari Websites › While Using",5000)}
+    else setGps("bad","GPS signal lost");
+  },{enableHighAccuracy:true,maximumAge:0,timeout:30000});
+}
+function onFix(pos){
+  const c=pos.coords,p=[c.latitude,c.longitude];
+  lastFix={p,acc:c.accuracy,t:pos.timestamp||Date.now()};
+  setGps(c.accuracy<=15?"good":c.accuracy<=35?"ok":"bad","GPS ±"+Math.round(c.accuracy*3.281)+" ft");
+  if(!meRec){meRec=L.marker(p,{icon:meIcon,interactive:false}).addTo(recMap);meRoute=L.marker(p,{icon:meIcon,interactive:false}).addTo(routeMap)}
+  else{meRec.setLatLng(p);meRoute.setLatLng(p)}
+  if(!centeredOnce){centeredOnce=true;recMap.setView(p,16);routeMap.setView(p,15)}
+  if(rec.state==="running")addPoint(p,c.accuracy,lastFix.t);
+  if(rec.state==="running"&&follow)recMap.panTo(p,{animate:true});
+}
+$("recCenter").onclick=()=>{follow=true;if(lastFix)recMap.setView(lastFix.p,17);else startWatch()};
+$("rtCenter").onclick=()=>{if(lastFix)routeMap.setView(lastFix.p,16);else startWatch()};
+let follow=true;recMap.on("dragstart",()=>{follow=false});
+
+/* ---------- recording ---------- */
+const rec={state:"idle",segs:[],dist:0,activeMs:0,resumeAt:0,start:0,splits:[],recent:[]};
+let trackLine=null,timerInt=null,wakeLock=null;
+function activeSec(){return(rec.activeMs+(rec.state==="running"?Date.now()-rec.resumeAt:0))/1000}
+function addPoint(p,acc,t){
+  if(acc>40)return;
+  const seg=rec.segs[rec.segs.length-1];const last=seg[seg.length-1];
+  if(last){
+    const d=hav([last[0],last[1]],p),dt=(t-last[2])/1000;
+    if(d<3)return;                          // jitter
+    if(dt>0&&d/dt>8.5)return;               // impossible jump (> ~3:10/mi)
+    const before=rec.dist;rec.dist+=d;
+    const nextMi=(rec.splits.length+1)*M_PER_MI;
+    if(rec.dist>=nextMi){
+      const frac=(nextMi-before)/d,tCross=activeSec()-(1-frac)*Math.max(dt,0);
+      const prevT=rec.splits.reduce((s,x)=>s+x,0);const split=tCross-prevT;
+      rec.splits.push(split);announceSplit(rec.splits.length,split);
+    }
+  }
+  seg.push([+p[0].toFixed(6),+p[1].toFixed(6),t]);
+  rec.recent.push([rec.dist,t]);while(rec.recent.length&&t-rec.recent[0][1]>30000)rec.recent.shift();
+  trackLine.setLatLngs(rec.segs.map(s=>s.map(x=>[x[0],x[1]])));
+  saveDraft();
+}
+function curPace(){const r=rec.recent;if(r.length<2)return NaN;const dd=r[r.length-1][0]-r[0][0],dt=(r[r.length-1][1]-r[0][1])/1000;return dd>10?dt/(dd/M_PER_MI):NaN}
+function paint(){
+  $("mDist").textContent=miles(rec.dist);$("mTime").textContent=fmtDur(activeSec());
+  $("mPace").textContent=rec.state==="running"?fmtPace(curPace()):"–";
+  $("mAvg").textContent=rec.dist>50?fmtPace(activeSec()/(rec.dist/M_PER_MI)):"–";
+  const st=rec.state;$("bStart").hidden=st!=="idle";$("bPause").hidden=st==="idle";$("bStop").hidden=st==="idle";
+  $("bPause").textContent=st==="paused"?"Resume":"Pause";$("bPause").className="btn"+(st==="paused"?" go":"");
+  $("tabs").classList.toggle("locked",st!=="idle");
+}
+function speak(text){try{if(!voiceOn)return;const u=new SpeechSynthesisUtterance(text);u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
+let voiceOn=true;
+function announceSplit(n,sec){
+  const m=Math.floor(sec/60),s=Math.round(sec%60);
+  $("lastSplit").textContent="Mile "+n+" · "+fmtPace(sec);
+  speak("Mile "+n+". Split "+m+" minutes "+s+" seconds. Total time "+fmtDur(activeSec()).replace(/:/g," "));
+  if(navigator.vibrate)navigator.vibrate([200,100,200]);
+}
+async function wake(on){try{if(on&&"wakeLock" in navigator&&!wakeLock){wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>wakeLock=null)}else if(!on&&wakeLock){await wakeLock.release();wakeLock=null}}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"){if(rec.state==="running")wake(true);startWatch()}});
+
+function begin(){
+  startWatch();
+  // unlock speech on iOS with a user gesture
+  try{speechSynthesis.speak(new SpeechSynthesisUtterance(""))}catch(e){}
+  Object.assign(rec,{state:"running",segs:[[]],dist:0,activeMs:0,resumeAt:Date.now(),start:Date.now(),splits:[],recent:[]});
+  if(trackLine)trackLine.remove();
+  trackLine=L.polyline([],{color:accent(),weight:6,opacity:.9}).addTo(recMap);
+  follow=true;if(lastFix){recMap.setView(lastFix.p,17);addPoint(lastFix.p,lastFix.acc,Date.now())}
+  $("lastSplit").textContent="";wake(true);speak("Run started");
+  clearInterval(timerInt);timerInt=setInterval(paint,500);paint();
+}
+$("bStart").onclick=begin;
+$("bPause").onclick=()=>{
+  if(rec.state==="running"){rec.activeMs+=Date.now()-rec.resumeAt;rec.state="paused";rec.recent=[];speak("Paused")}
+  else{rec.state="running";rec.resumeAt=Date.now();rec.segs.push([]);speak("Resumed")}
+  saveDraft();paint();
+};
+$("bStop").onclick=()=>{
+  if($("bStop").dataset.arm!=="1"){$("bStop").dataset.arm="1";$("bStop").textContent="Tap to finish";setTimeout(()=>{$("bStop").dataset.arm="";$("bStop").textContent="Finish"},3000);return}
+  $("bStop").dataset.arm="";$("bStop").textContent="Finish";
+  if(rec.state==="running")rec.activeMs+=Date.now()-rec.resumeAt;
+  rec.state="idle";clearInterval(timerInt);wake(false);paint();
+  const run={id:"r"+rec.start,start:rec.start,dist:Math.round(rec.dist),moving:Math.round(rec.activeMs/1000),splits:rec.splits.map(s=>Math.round(s)),
+    segs:rec.segs.filter(s=>s.length),name:defaultName(rec.start),routeId:followRoute?followRoute.id:null};
+  clearDraft();
+  if(run.dist<50){toast("Too short to save. Under 0.03 mi.");resetRec();return}
+  speak("Run finished. "+miles(run.dist)+" miles in "+fmtDur(run.moving).replace(/:/g," "));
+  openRun(run,true);
+};
+function resetRec(){Object.assign(rec,{segs:[],dist:0,activeMs:0,splits:[],recent:[]});if(trackLine){trackLine.remove();trackLine=null}$("lastSplit").textContent="";paint()}
+function defaultName(ts){const h=new Date(ts).getHours();return(h<5?"Night":h<12?"Morning":h<17?"Afternoon":h<21?"Evening":"Night")+" Run"}
+
+/* crash/refresh recovery */
+let draftT=0;
+function saveDraft(){if(Date.now()-draftT<4000&&rec.state==="running")return;draftT=Date.now();try{localStorage.setItem("rc_draft",JSON.stringify({rec:Object.assign({},rec,{activeMs:rec.activeMs+(rec.state==="running"?Date.now()-rec.resumeAt:0),resumeAt:Date.now()}),savedAt:Date.now()}))}catch(e){}}
+function clearDraft(){try{localStorage.removeItem("rc_draft")}catch(e){}}
+function restoreDraft(){
+  try{const d=JSON.parse(localStorage.getItem("rc_draft")||"null");if(!d||Date.now()-d.savedAt>6*3600e3)return;
+    Object.assign(rec,d.rec,{state:"paused",recent:[]});
+    trackLine=L.polyline(rec.segs.map(s=>s.map(x=>[x[0],x[1]])),{color:accent(),weight:6,opacity:.9}).addTo(recMap);
+    if(rec.segs.flat().length)recMap.fitBounds(trackLine.getBounds(),{padding:[30,30]});
+    clearInterval(timerInt);timerInt=setInterval(paint,500);paint();toast("Recovered your run in progress. Tap Resume or Finish.",4000);
+  }catch(e){}
+}
+
+/* follow a saved route on the record map */
+let followRoute=null,followLine=null;
+function setFollow(r){
+  followRoute=r;if(followLine){followLine.remove();followLine=null}
+  $("followPill").hidden=!r;
+  if(r){followLine=L.polyline(r.pts,{color:css("--amber")||"#E39A1F",weight:5,opacity:.85,dashArray:"8 8"}).addTo(recMap);
+    $("followText").textContent=r.name+" · "+miles(r.dist)+" mi";recMap.fitBounds(followLine.getBounds(),{padding:[40,40]});follow=false}
+}
+$("unfollow").onclick=()=>setFollow(null);
+
+/* ---------- route builder ---------- */
+let wps=[],legs=[],wpMarkers=[],routeLine=null,busy=false,mode="draw";
+const wpIcon=start=>L.divIcon({className:"",html:'<div class="wp'+(start?" start":"")+'"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+async function routeLeg(a,b){
+  if(!$("snap").checked)return[a,b];
+  const url=ROUTER+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=full&geometries=geojson";
+  try{const r=await fetch(url);const j=await r.json();if(j.code!=="Ok")throw 0;return j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]])}
+  catch(e){toast("Couldn't snap to roads here. Drew a straight line.");return[a,b]}
+}
+function routePts(){const out=[];legs.forEach((l,i)=>l.forEach((p,j)=>{if(i>0&&j===0)return;out.push(p)}));return out.length?out:wps.slice()}
+function drawRoute(){
+  wpMarkers.forEach(m=>m.remove());wpMarkers=wps.map((p,i)=>L.marker(p,{icon:wpIcon(i===0),interactive:false}).addTo(routeMap));
+  const pts=routePts();if(!routeLine)routeLine=L.polyline([],{color:accent(),weight:6,opacity:.9}).addTo(routeMap);
+  routeLine.setLatLngs(pts);const d=pathLen(pts);
+  $("rDistPill").textContent=miles(d)+" mi";$("rSave").disabled=pts.length<2;
+  $("routeHint").textContent=wps.length?(wps.length===1?"Tap to add the next point":"Keep tapping to extend"):"Tap the map to start a route";
+}
+routeMap.on("click",async e=>{
+  if(mode!=="draw"||busy)return;const p=[e.latlng.lat,e.latlng.lng];
+  if(!wps.length){wps.push(p);drawRoute();return}
+  busy=true;const leg=await routeLeg(wps[wps.length-1],p);busy=false;
+  wps.push(p);legs.push(leg);drawRoute();
+});
+$("rUndo").onclick=()=>{if(!wps.length)return;wps.pop();legs.pop();drawRoute()};
+$("rClear").onclick=()=>{wps=[];legs=[];drawRoute()};
+$("rBack").onclick=()=>{if(wps.length<2)return;const back=legs.slice().reverse().map(l=>l.slice().reverse());const bw=wps.slice(0,-1).reverse();legs=legs.concat(back);wps=wps.concat(bw);drawRoute();toast("Doubled into an out-and-back")};
+$("rClose").onclick=async()=>{if(wps.length<2||busy)return;busy=true;const leg=await routeLeg(wps[wps.length-1],wps[0]);busy=false;wps.push(wps[0]);legs.push(leg);drawRoute()};
+
+async function makeLoop(){
+  const target=parseFloat($("loopMi").value)*M_PER_MI;
+  const c=routeMap.getCenter(),start=lastFix?lastFix.p:[c.lat,c.lng];
+  const brg=Math.random()*360;let r=target/(2*Math.PI)*0.78,best=null;
+  $("loopGo").disabled=true;$("loopGo").textContent="Finding a loop…";
+  try{
+    for(let i=0;i<4;i++){
+      const center=dest(start,brg,r),w=[];
+      for(const a of[brg+180+75,brg+180+150,brg+180+225,brg+180+290])w.push(dest(center,a%360,r));
+      const coords=[start,...w,start].map(p=>p[1]+","+p[0]).join(";");
+      const j=await (await fetch(ROUTER+coords+"?overview=full&geometries=geojson")).json();
+      if(j.code!=="Ok")throw 0;
+      const pts=j.routes[0].geometry.coordinates.map(x=>[x[1],x[0]]),d=j.routes[0].distance;
+      if(!best||Math.abs(d-target)<Math.abs(best.d-target))best={pts,d,w};
+      if(Math.abs(d-target)/target<0.07)break;
+      r*=target/d;
+    }
+    wps=[start,start];legs=[best.pts];drawRoute();
+    routeMap.fitBounds(routeLine.getBounds(),{padding:[30,30]});
+    $("rName").value=$("loopMi").selectedOptions[0].text+" loop";
+    toast("Loop: "+miles(best.d)+" mi. Tap again for a different one.");
+  }catch(e){toast("Couldn't build a loop here. Check your connection or move the map.")}
+  $("loopGo").disabled=false;$("loopGo").textContent="Make a loop";
+}
+$("loopGo").onclick=makeLoop;
+
+function setMode(m){mode=m;["Draw","Loop","Saved"].forEach(k=>{$("mode"+k).classList.toggle("on",k.toLowerCase()===m);$("p"+k).hidden=k.toLowerCase()!==m});$("saveRow").hidden=m==="saved"}
+$("modeDraw").onclick=()=>setMode("draw");$("modeLoop").onclick=()=>setMode("loop");$("modeSaved").onclick=()=>setMode("saved");
+
+$("rSave").onclick=async()=>{
+  const pts=routePts();if(pts.length<2)return;
+  const r={id:"rt"+Date.now(),name:$("rName").value.trim()||(miles(pathLen(pts))+" mi route"),pts:pts.map(p=>[+p[0].toFixed(6),+p[1].toFixed(6)]),dist:Math.round(pathLen(pts)),created:Date.now()};
+  try{await DB.put("routes",r);ROUTES.unshift(r);renderRouteList();toast("Route saved");$("rName").value="";setMode("saved")}catch(e){toast("Couldn't save the route.")}
+};
+
+function miniSvg(pts){
+  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");svg.setAttribute("viewBox","0 0 58 58");svg.setAttribute("class","mini");svg.setAttribute("aria-hidden","true");
+  if(pts.length<2)return svg;
+  const la=pts.map(p=>p[0]),lo=pts.map(p=>p[1]),a0=Math.min(...la),a1=Math.max(...la),o0=Math.min(...lo),o1=Math.max(...lo);
+  const k=Math.cos(a0*Math.PI/180),w=(o1-o0)*k||1e-6,h=(a1-a0)||1e-6,sc=46/Math.max(w,h),ox=(58-w*sc)/2,oy=(58-h*sc)/2;
+  const step=Math.max(1,Math.floor(pts.length/150)),pl=document.createElementNS(ns,"polyline");
+  pl.setAttribute("points",pts.filter((_,i)=>i%step===0||i===pts.length-1).map(p=>(ox+(p[1]-o0)*k*sc).toFixed(1)+","+(oy+(a1-p[0])*sc).toFixed(1)).join(" "));
+  pl.setAttribute("fill","none");pl.setAttribute("stroke",accent());pl.setAttribute("stroke-width","2.5");pl.setAttribute("stroke-linejoin","round");pl.setAttribute("stroke-linecap","round");
+  svg.append(pl);return svg;
+}
+function renderRouteList(){
+  const box=$("routeList");box.textContent="";
+  if(!ROUTES.length){const e=el("div","empty");e.append(el("b",null,"No saved routes"),el("span","muted","Draw one or make an auto loop, then tap Save route."));box.append(e);return}
+  ROUTES.forEach(r=>{
+    const it=el("div","item");it.append(miniSvg(r.pts));
+    const m=el("div","main");m.append(el("div","t",r.name),el("div","s num",miles(r.dist)+" mi"));it.append(m);
+    const a=el("div","row");a.style.cssText="gap:6px;flex-direction:column;align-items:flex-end";
+    const run=el("button","btn small primary","Run it");run.onclick=()=>{setFollow(r);show("record");toast("Route loaded. Tap Start when ready.")};
+    const more=el("div","row");more.style.gap="6px";
+    const view=el("button","btn small ghost","Edit");view.onclick=()=>{wps=[r.pts[0],r.pts[r.pts.length-1]];legs=[r.pts];$("rName").value=r.name;setMode("draw");drawRoute();routeMap.fitBounds(routeLine.getBounds(),{padding:[30,30]})};
+    const gpx=el("button","btn small ghost","GPX");gpx.onclick=()=>exportGpx(r.name,[r.pts.map(p=>[p[0],p[1]])],null,true);
+    const del=el("button","btn small ghost","Delete");del.onclick=async()=>{if(del.dataset.arm){await DB.del("routes",r.id);ROUTES=ROUTES.filter(x=>x.id!==r.id);renderRouteList();toast("Route deleted")}else{del.dataset.arm="1";del.textContent="Sure?";setTimeout(()=>{delete del.dataset.arm;del.textContent="Delete"},3000)}};
+    more.append(view,gpx,del);a.append(run,more);it.append(a);box.append(it);
+  });
+}
+
+/* ---------- GPX export ---------- */
+function exportGpx(name,segs,startTs,isRoute){
+  const esc=s=>String(s).replace(/[<&>"]/g,c=>({"<":"&lt;","&":"&amp;",">":"&gt;",'"':"&quot;"}[c]));
+  let x='<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Run Club" xmlns="http://www.topografix.com/GPX/1/1">\n';
+  x+="<metadata><name>"+esc(name)+"</name>"+(startTs?"<time>"+new Date(startTs).toISOString()+"</time>":"")+"</metadata>\n";
+  x+="<trk><name>"+esc(name)+"</name><type>running</type>\n";
+  segs.forEach(s=>{x+="<trkseg>\n";s.forEach(p=>{x+='<trkpt lat="'+p[0]+'" lon="'+p[1]+'">'+(p[2]?"<time>"+new Date(p[2]).toISOString()+"</time>":"")+"</trkpt>\n"});x+="</trkseg>\n"});
+  x+="</trk>\n</gpx>";
+  const file=new File([x],name.replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-")+".gpx",{type:"application/gpx+xml"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:name}).catch(()=>{});return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=file.name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+
+/* ---------- run detail / save sheet ---------- */
+let sheetLayers=[];
+function openRun(run,isNew){
+  $("sheet").hidden=false;$("shTitle").textContent=isNew?"Save run":new Date(run.start).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});
+  if(!detailMap)detailMap=makeMap("detailMap");
+  sheetLayers.forEach(l=>l.remove());sheetLayers=[];
+  setTimeout(()=>{detailMap.invalidateSize();const line=L.polyline(run.segs.map(s=>s.map(p=>[p[0],p[1]])),{color:accent(),weight:5}).addTo(detailMap);sheetLayers.push(line);
+    const all=run.segs.flat();if(all.length){sheetLayers.push(L.circleMarker([all[0][0],all[0][1]],{radius:7,color:"#fff",weight:2,fillColor:css("--go"),fillOpacity:1}).addTo(detailMap));
+      sheetLayers.push(L.circleMarker([all[all.length-1][0],all[all.length-1][1]],{radius:7,color:"#fff",weight:2,fillColor:css("--stop"),fillOpacity:1}).addTo(detailMap));
+      detailMap.fitBounds(line.getBounds(),{padding:[24,24]})}},60);
+  const b=$("shBody");b.textContent="";
+  const name=el("input","text");name.id="runName";name.value=run.name;name.setAttribute("aria-label","Run name");name.style.width="100%";b.append(name);
+  const g=el("div","stats");const cell=(l,v)=>{const d=el("div");d.append(el("b","num",v),el("span","label",l));return d};
+  g.append(cell("Miles",miles(run.dist)),cell("Moving time",fmtDur(run.moving)),cell("Avg pace /mi",fmtPace(run.moving/(run.dist/M_PER_MI))),cell("Started",new Date(run.start).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})));b.append(g);
+  if(run.splits&&run.splits.length){
+    b.append(el("h3",null,"Splits"));const t=el("table","splits"),fast=Math.min(...run.splits),slow=Math.max(...run.splits);
+    t.innerHTML="<tr><th>Mile</th><th>Pace</th><th style='width:45%'></th></tr>";
+    run.splits.forEach((s,i)=>{const tr=document.createElement("tr");const w=slow===fast?100:40+60*(slow-s)/(slow-fast);
+      tr.innerHTML="<td>"+(i+1)+"</td><td>"+fmtPace(s)+(s===fast&&run.splits.length>1?" ⚡":"")+"</td><td><div class='bar' style='width:"+w.toFixed(0)+"%'></div></td>";t.append(tr)});
+    const rem=run.dist%M_PER_MI;if(rem>80){const tr=document.createElement("tr");tr.innerHTML="<td>"+(rem/M_PER_MI).toFixed(2)+"</td><td class='muted'>partial</td><td></td>";t.append(tr)}
+    b.append(t);
+  }
+  const acts=el("div","row");
+  if(isNew){
+    const save=el("button","btn primary","Save run");save.onclick=async()=>{run.name=name.value.trim()||run.name;try{const before=earnedCount();await DB.put("runs",run);RUNS.unshift(run);renderAll();closeSheet();resetRec();const nb=earnedCount()>before;toast(nb?"Saved · new badge unlocked!":(prCheck(run)||"Run saved"));if(nb)speak("New badge unlocked")}catch(e){toast("Couldn't save. Try again.")}};
+    const discard=el("button","btn ghost","Discard");discard.onclick=()=>{if(discard.dataset.arm){closeSheet();resetRec();toast("Run discarded")}else{discard.dataset.arm="1";discard.textContent="Discard for good?"}};
+    acts.append(save,discard);
+  }else{
+    const rn=el("button","btn ghost","Rename");rn.onclick=async()=>{run.name=name.value.trim()||run.name;await DB.put("runs",run);renderHistory();toast("Renamed")};
+    const gx=el("button","btn ghost","Export GPX");gx.onclick=()=>exportGpx(run.name,run.segs,run.start);
+    const sv=el("button","btn ghost","Save as route");sv.onclick=async()=>{const pts=run.segs.flat().map(p=>[p[0],p[1]]);const r={id:"rt"+Date.now(),name:run.name+" route",pts,dist:run.dist,created:Date.now()};await DB.put("routes",r);ROUTES.unshift(r);renderRouteList();toast("Saved to routes")};
+    const del=el("button","btn ghost","Delete");del.style.color="var(--stop)";del.onclick=async()=>{if(del.dataset.arm){await DB.del("runs",run.id);RUNS=RUNS.filter(x=>x.id!==run.id);renderAll();closeSheet();toast("Run deleted")}else{del.dataset.arm="1";del.textContent="Delete for good?"}};
+    acts.append(rn,gx,sv,del);
+  }
+  b.append(acts);
+}
+function closeSheet(){$("sheet").hidden=true}
+$("shClose").onclick=()=>{if($("shTitle").textContent==="Save run"){toast("Save or discard the run first");return}closeSheet()};
+
+function prCheck(run){
+  const others=RUNS.filter(r=>r.id!==run.id);
+  if(run.dist>Math.max(0,...others.map(r=>r.dist)))return"Saved · new longest run!";
+  if(run.splits.length&&others.some(r=>r.splits&&r.splits.length)&&Math.min(...run.splits)<Math.min(...others.flatMap(r=>r.splits||[])))return"Saved · fastest mile ever!";
+  return null;
+}
+
+/* ---------- history & stats ---------- */
+function renderHistory(){
+  const box=$("histList");box.textContent="";
+  $("histCount").textContent=RUNS.length?RUNS.length+" runs · "+miles(RUNS.reduce((s,r)=>s+r.dist,0))+" mi":"";
+  if(!RUNS.length){const e=el("div","empty");e.append(el("b",null,"No runs yet"),el("span","muted","Go to Record and tap Start. Every run lands here with its map, splits, and pace."));box.append(e);return}
+  const list=el("div","list");
+  RUNS.forEach(r=>{
+    const it=el("button","item");it.onclick=()=>openRun(r,false);
+    it.append(miniSvg(r.segs.flat()));
+    const m=el("div","main");m.append(el("div","t",r.name),el("div","s",new Date(r.start).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})));
+    const v=el("div","num");v.style.textAlign="right";const big=el("div",null,miles(r.dist)+" mi");big.style.cssText="font-family:var(--display);font-weight:800;font-size:22px";
+    v.append(big,el("div","s",fmtPace(r.moving/(r.dist/M_PER_MI))+" /mi"));it.append(m,v);list.append(it);
+  });
+  box.append(list);
+}
+function renderStats(){
+  const g=$("statGrid");g.textContent="";const cell=(l,v)=>{const d=el("div");d.append(el("b","num",v),el("span","label",l));return d};
+  const tot=RUNS.reduce((s,r)=>s+r.dist,0),mov=RUNS.reduce((s,r)=>s+r.moving,0),wk=monday(new Date()).getTime();
+  const thisWk=RUNS.filter(r=>r.start>=wk).reduce((s,r)=>s+r.dist,0);
+  g.append(cell("This week",miles(thisWk)+" mi"),cell("Total miles",miles(tot)),cell("Runs",String(RUNS.length)),cell("Avg pace /mi",tot?fmtPace(mov/(tot/M_PER_MI)):"–"));
+  const n=12,W=520,H=180,pl=30,pb=26,pt=12,start=wk-(n-1)*7*864e5;
+  const vals=[...Array(n)].map((_,i)=>RUNS.filter(r=>r.start>=start+i*7*864e5&&r.start<start+(i+1)*7*864e5).reduce((s,r)=>s+r.dist,0)/M_PER_MI);
+  const max=Math.max(10,Math.ceil(Math.max(...vals)/5)*5),bw=(W-pl-8)/n;
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Weekly miles, last 12 weeks">';
+  for(let t=0;t<=max;t+=max/5){const y=pt+(H-pt-pb)*(1-t/max);s+='<line x1="'+pl+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="var(--line)"/><text x="'+(pl-6)+'" y="'+(y+4)+'" text-anchor="end">'+t+'</text>'}
+  vals.forEach((v,i)=>{const h=(H-pt-pb)*(v/max),x=pl+4+i*bw,y=H-pb-h,cur=i===n-1;
+    s+='<rect x="'+(x+3)+'" y="'+y+'" width="'+(bw-6)+'" height="'+h+'" rx="3" fill="'+(cur?"var(--accent)":"color-mix(in srgb, var(--accent) 45%, var(--sunk))")+'"/>';
+    if(i%3===0||cur)s+='<text x="'+(x+bw/2)+'" y="'+(H-8)+'" text-anchor="middle">'+(cur?"This wk":new Date(start+i*7*864e5).toLocaleDateString(undefined,{month:"short",day:"numeric"}))+'</text>'});
+  $("weekChart").innerHTML=s+"</svg>";
+  const pr=$("prList");pr.textContent="";
+  const longest=RUNS.reduce((a,b)=>!a||b.dist>a.dist?b:a,null);
+  let fm=null;RUNS.forEach(r=>(r.splits||[]).forEach(x=>{if(!fm||x<fm.t)fm={t:x,r}}));
+  const best=(lo)=>RUNS.filter(r=>r.dist>=lo*M_PER_MI).reduce((a,b)=>{const pb=b.moving/b.dist;return!a||pb<a.moving/a.dist?b:a},null);
+  [["Longest run",longest,r=>miles(r.dist)+" mi"],["Fastest mile",fm&&fm.r,()=>fmtPace(fm.t)],["Best 5K pace",best(3.1),r=>fmtPace(r.moving/(r.dist/M_PER_MI))+" /mi"],["Best 10K pace",best(6.2),r=>fmtPace(r.moving/(r.dist/M_PER_MI))+" /mi"]]
+  .forEach(([lab,r,f])=>{const it=el("div","item");it.style.gridTemplateColumns="1fr auto";const a=el("div","main");a.append(el("div","t",lab),el("div","s",r?new Date(r.start).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}):"Not yet"));
+    const v=el("div","num",r?f(r):"–");v.style.cssText="font-family:var(--display);font-size:24px;font-weight:800";it.append(a,v);pr.append(it)});
+}
+
+/* ---------- training plan ---------- */
+const DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const parseYmd=s=>{const[a,b,c]=s.split("-").map(Number);return new Date(a,b-1,c)};
+const addDays=(s,n)=>{const d=parseYmd(s);d.setDate(d.getDate()+n);return ymd(d)};
+const today=()=>ymd(new Date());
+const shortDate=s=>parseYmd(s).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+const runDay=r=>ymd(new Date(r.start));
+const GOALS={
+  "5k":{name:"5K personal best",weeks:8,race:3.1,longs:[3,3.5,4,3,4.5,5,4,0],easy:[2.5,2.5,3,2.5,3,3.5,3,2]},
+  "10k":{name:"10K",weeks:10,race:6.2,longs:[4,4.5,5,4,5.5,6,6.5,5,7,0],easy:[3,3,3,3,3.5,3.5,4,3.5,4,2.5]},
+  "half":{name:"Half marathon",weeks:12,race:13.1,longs:[5,6,7,5,8,9,10,7,11,12,8,0],easy:[3,3,3.5,3,3.5,4,4,3.5,4,4.5,3.5,3]}
+};
+const QUALITY=[
+  ["tempo","Tempo","15 min warm-up, 15 min comfortably hard, cool down"],
+  ["intervals","Intervals","6 × 400 m fast, 90 s jog between"],
+  ["tempo","Tempo","2 × 10 min comfortably hard, 3 min jog between"],
+  ["intervals","Intervals","5 × 800 m at goal race pace, 2 min jog between"],
+  ["hills","Hills","8 × 45 s uphill hard, jog back down. Bridges work in flat Florida."],
+  ["tempo","Steady","20–25 min steady at half-marathon effort"]
+];
+let PLAN=null;try{PLAN=JSON.parse(localStorage.getItem("rc_plan")||"null")}catch(e){}
+function savePlan(p){PLAN=p;try{p?localStorage.setItem("rc_plan",JSON.stringify(p)):localStorage.removeItem("rc_plan")}catch(e){toast("Couldn't save the plan.")}renderAll()}
+function buildPlan(goal,start){
+  const g=GOALS[goal],weeks=[];
+  for(let i=0;i<g.weeks;i++){
+    const last=i===g.weeks-1,cut=(i+1)%4===0&&!last,q=QUALITY[i%QUALITY.length],easy=g.easy[i];
+    const s=[
+      {dow:1,type:"easy",title:"Easy run",desc:"Conversational pace. You should be able to talk.",mi:easy},
+      {dow:3,type:last?"easy":q[0],title:last?"Shakeout":q[1],desc:last?"Easy 20 min with 4 short strides.":q[2],mi:last?2:Math.max(3,easy+0.5)},
+      last?{dow:5,type:"race",title:"Race day",desc:"Start controlled, finish strong.",mi:g.race}
+          :{dow:5,type:"long",title:"Long run",desc:cut?"Cutback week. Keep it relaxed.":"Slow and steady. Walk breaks are fine.",mi:g.longs[i]}
+    ];
+    if(!last&&i>=2)s.push({dow:6,type:"easy",title:"Recovery jog",desc:"Optional. 20–30 min very easy.",mi:2});
+    weeks.push({sessions:s.map((x,j)=>Object.assign({key:"w"+(i+1)+"s"+j,date:addDays(start,i*7+x.dow)},x))});
+  }
+  return weeks;
+}
+function planWeeks(){return PLAN&&GOALS[PLAN.goal]?buildPlan(PLAN.goal,PLAN.start):null}
+function sessionDone(s){if(PLAN.done&&PLAN.done[s.key]!==undefined)return!!PLAN.done[s.key];return RUNS.some(r=>runDay(r)===s.date)}
+function mondayStr(s){return ymd(monday(parseYmd(s)))}
+
+function renderToday(){
+  const t=$("todayLine");t.textContent="";const pw=planWeeks();if(!pw)return;
+  const s=pw.flatMap(w=>w.sessions).find(x=>x.date>=today());
+  if(!s){t.textContent="Plan complete. Set a new goal in Plan.";return}
+  const lbl=s.date===today()?"Today: ":DOW[s.dow]+" "+shortDate(s.date)+": ";
+  t.append(el("b",null,lbl+s.title+" · "+s.mi.toFixed(1)+" mi"));
+}
+function renderPlan(){
+  const setup=$("planSetup"),body=$("planBody");setup.textContent="";body.textContent="";
+  const pw=planWeeks();
+  if(!pw){
+    const e=el("div","empty");
+    e.append(el("b",null,"Pick a goal"),el("span","muted","Built for someone already running a few miles: 3–4 runs a week, one quality workout, a long run that grows, and an easier cutback week every fourth week."));
+    const sel=el("select","text");sel.id="goalSel";Object.entries(GOALS).forEach(([k,g])=>{const o=el("option",null,g.name+" · "+g.weeks+" weeks");o.value=k;sel.append(o)});sel.value="10k";
+    const dt=el("input","text");dt.type="date";dt.id="goalStart";dt.value=ymd(new Date(monday(new Date()).getTime()+7*864e5));
+    const go=el("button","btn primary","Start plan");go.onclick=()=>{savePlan({goal:sel.value,start:mondayStr(dt.value||today()),done:{}});toast("Plan created")};
+    const r1=el("div","row");r1.append(sel);const r2=el("div","row");r2.append(el("span","label","Starts the week of"),dt);
+    e.append(r1,r2,go);setup.append(e);return;
+  }
+  const g=GOALS[PLAN.goal],all=pw.flatMap(w=>w.sessions),race=all[all.length-1],doneN=all.filter(sessionDone).length;
+  const head=el("div","row between"),info=el("div");
+  info.append(el("b",null,g.name),el("div","muted",g.weeks+" weeks · race day "+parseYmd(race.date).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})));
+  const reset=el("button","btn small ghost","Change goal");reset.style.color="var(--stop)";
+  reset.onclick=()=>{if(reset.dataset.arm)savePlan(null);else{reset.dataset.arm="1";reset.textContent="Clear plan?";setTimeout(()=>{if(reset.isConnected){delete reset.dataset.arm;reset.textContent="Change goal"}},3000)}};
+  head.append(info,reset);setup.append(head);
+  const pr=el("div","progress");const bar=el("div");bar.style.width=(100*doneN/all.length).toFixed(0)+"%";pr.append(bar);
+  setup.append(pr,el("p","note num",doneN+" of "+all.length+" sessions done. A run recorded on a planned day checks it off automatically."));
+  const wk=ymd(monday(new Date()));let cur=null;
+  pw.forEach((w,i)=>{
+    const ws=mondayStr(w.sessions[0].date),isCur=ws===wk,past=addDays(ws,7)<=today();
+    const box=el("div","week"+(isCur?" current":""));if(isCur)cur=box;
+    const tot=w.sessions.reduce((s,x)=>s+x.mi,0),dn=w.sessions.filter(sessionDone).length;
+    const wh=el("div","wh");wh.append(el("h3",null,"Week "+(i+1)+(isCur?" · now":"")),el("span","label num",tot.toFixed(1)+" mi"+(past?" · "+dn+"/"+w.sessions.length+" done":"")));box.append(wh);
+    if(!(past&&!isCur))w.sessions.forEach(s=>{
+      const done=sessionDone(s),row=el("label","sess"+(done?" done":""));
+      const cb=el("input");cb.type="checkbox";cb.checked=done;cb.id="cb-"+s.key;
+      cb.onchange=()=>savePlan(Object.assign({},PLAN,{done:Object.assign({},PLAN.done||{},{[s.key]:cb.checked})}));
+      const d=el("div","d");d.append(document.createTextNode(DOW[s.dow]));const sd=el("div","muted num",shortDate(s.date));sd.style.cssText="font-weight:400;font-size:12px";d.append(sd);
+      const wd=el("div","w"),tt=el("div");tt.append(el("span","chip "+s.type,s.type),el("b",null,s.title));wd.append(tt,el("div","note",s.desc));
+      row.append(cb,d,wd,el("span","mi num",s.mi.toFixed(1)));box.append(row);
+    });
+    body.append(box);
+  });
+  if(cur&&$("s-plan").classList.contains("on")&&!renderPlan.scrolled){renderPlan.scrolled=true;setTimeout(()=>cur.scrollIntoView({block:"start"}),40)}
+}
+
+/* ---------- streaks & badges ---------- */
+function weekRunCount(ws){return RUNS.filter(r=>{const d=runDay(r);return d>=ws&&d<addDays(ws,7)}).length}
+function weekStreak(){let s=0,w=ymd(monday(new Date()));if(weekRunCount(w)<3)w=addDays(w,-7);while(weekRunCount(w)>=3){s++;w=addDays(w,-7)}return s}
+function bestWeekStreak(){const ws=[...new Set(RUNS.map(r=>mondayStr(runDay(r))))].sort();let best=0;ws.forEach(w=>{let s=0,x=w;while(weekRunCount(x)>=3){s++;x=addDays(x,7)}best=Math.max(best,s)});return best}
+function dayStreak(){const set=new Set(RUNS.map(runDay));let d=today();if(!set.has(d))d=addDays(d,-1);let s=0;while(set.has(d)){s++;d=addDays(d,-1)}return s}
+function bestDayStreak(){const set=new Set(RUNS.map(runDay));let best=0;set.forEach(d=>{if(set.has(addDays(d,-1)))return;let s=0,x=d;while(set.has(x)){s++;x=addDays(x,1)}best=Math.max(best,s)});return best}
+function badges(){
+  const tot=RUNS.reduce((s,r)=>s+r.dist,0)/M_PER_MI,long=Math.max(0,...RUNS.map(r=>r.dist))/M_PER_MI,ws=Math.max(weekStreak(),bestWeekStreak());
+  const fastMile=Math.min(Infinity,...RUNS.flatMap(r=>r.splits||[]));
+  const pw=planWeeks(),planDone=pw?pw.flatMap(w=>w.sessions).filter(sessionDone).length:0,planAll=pw?pw.flatMap(w=>w.sessions).length:0;
+  return[
+    ["1","First steps","Record your first run",RUNS.length>=1],
+    ["5K","5K finisher","Run 3.1 mi in one go",long>=3.1],
+    ["10K","10K finisher","Run 6.2 mi in one go",long>=6.2],
+    ["13.1","Half distance","Run 13.1 mi in one go",long>=13.1],
+    ["50","50 club","50 total miles",tot>=50],
+    ["100","Century","100 total miles",tot>=100],
+    ["250","Road warrior","250 total miles",tot>=250],
+    ["4W","Habit formed","4 weeks in a row with 3+ runs",ws>=4],
+    ["8W","Locked in","8-week streak",ws>=8],
+    ["7D","Seven straight","Run 7 days in a row",bestDayStreak()>=7],
+    ["AM","Early bird","5 runs started before 7 am",RUNS.filter(r=>new Date(r.start).getHours()<7).length>=5],
+    ["SUB9","Sub-9 mile","A mile split under 9:00",fastMile<540],
+    ["SUB8","Sub-8 mile","A mile split under 8:00",fastMile<480],
+    ["MAP","Route runner","Finish a run on a saved route",RUNS.some(r=>r.routeId)],
+    ["PLAN","Plan finisher","Complete 90% of a plan",planAll>0&&planDone/planAll>=0.9]
+  ];
+}
+function earnedCount(){return badges().filter(b=>b[3]).length}
+function renderBadges(){
+  const g=$("streakGrid");g.textContent="";const cell=(l,v)=>{const d=el("div");d.append(el("b","num",v),el("span","label",l));return d};
+  const list=badges();
+  g.append(cell("Week streak (3+ runs)",String(weekStreak())),cell("Best week streak",String(bestWeekStreak())),cell("Day streak",String(dayStreak())),cell("Badges",list.filter(b=>b[3]).length+" / "+list.length));
+  const bg=$("badgeGrid");bg.textContent="";
+  list.forEach(([mark,name,desc,got])=>{const b=el("div","badge"+(got?" got":""));b.append(el("div","medal",mark),el("b",null,name),el("span",null,got?"Earned":desc));bg.append(b)});
+}
+function renderAll(){renderHistory();renderStats();renderRouteList();renderPlan();renderBadges();renderToday()}
+
+/* ---------- tabs ---------- */
+function show(s){
+  document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.toggle("on",b.dataset.s===s));
+  document.querySelectorAll(".screen").forEach(x=>x.classList.toggle("on",x.id==="s-"+s));
+  if(s==="record")setTimeout(()=>recMap.invalidateSize(),30);
+  if(s==="routes")setTimeout(()=>routeMap.invalidateSize(),30);
+  if(s==="plan"){renderPlan.scrolled=false;renderPlan()}
+}
+document.querySelectorAll("nav.tabs button").forEach(b=>b.onclick=()=>show(b.dataset.s));
+
+/* ---------- boot ---------- */
+paint();renderAll();loadAll();restoreDraft();startWatch();
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
